@@ -14,6 +14,7 @@ import io.javalin.core.HandlerType;
 import io.javalin.core.JavalinServlet;
 import io.javalin.core.PathMatcher;
 import io.javalin.core.util.CorsUtil;
+import io.javalin.core.util.RouteOverviewEntry;
 import io.javalin.core.util.Util;
 import io.javalin.embeddedserver.EmbeddedServer;
 import io.javalin.embeddedserver.EmbeddedServerFactory;
@@ -27,6 +28,7 @@ import io.javalin.event.EventManager;
 import io.javalin.event.EventType;
 import io.javalin.security.AccessManager;
 import io.javalin.security.Role;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,8 @@ import org.slf4j.LoggerFactory;
 public class Javalin {
 
     private static Logger log = LoggerFactory.getLogger(Javalin.class);
+
+    public List<RouteOverviewEntry> routeOverviewEntries = new ArrayList<>();
 
     private int port = 7000;
     private String contextPath = "/";
@@ -220,14 +224,16 @@ public class Javalin {
         return this;
     }
 
-    private Javalin addHandler(@NotNull HandlerType httpMethod, @NotNull String path, @NotNull Handler handler) {
+    private Javalin addHandler(@NotNull HandlerType httpMethod, @NotNull String path, @NotNull Handler handler, List<Role> roles) {
+        routeOverviewEntries.add(new RouteOverviewEntry(httpMethod, path, handler, roles));
         String prefixedPath = Util.INSTANCE.prefixContextPath(path, contextPath);
-        pathMatcher.getHandlerEntries().add(new HandlerEntry(httpMethod, prefixedPath, handler));
+        Handler handlerWrap = roles == null ? handler : ctx -> accessManager.manage(handler, ctx, roles);
+        pathMatcher.getHandlerEntries().add(new HandlerEntry(httpMethod, prefixedPath, handlerWrap));
         return this;
     }
 
-    private Javalin addSecuredHandler(@NotNull HandlerType httpMethod, @NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addHandler(httpMethod, path, ctx -> accessManager.manage(handler, ctx, permittedRoles));
+    private Javalin addHandler(@NotNull HandlerType httpMethod, @NotNull String path, @NotNull Handler handler) {
+        return addHandler(httpMethod, path, handler, null);
     }
 
     // HTTP verbs
@@ -269,39 +275,39 @@ public class Javalin {
 
     // Secured HTTP verbs
     public Javalin get(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.GET, path, handler, permittedRoles);
+        return addHandler(HandlerType.GET, path, handler, permittedRoles);
     }
 
     public Javalin post(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.POST, path, handler, permittedRoles);
+        return addHandler(HandlerType.POST, path, handler, permittedRoles);
     }
 
     public Javalin put(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.PUT, path, handler, permittedRoles);
+        return addHandler(HandlerType.PUT, path, handler, permittedRoles);
     }
 
     public Javalin patch(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.PATCH, path, handler, permittedRoles);
+        return addHandler(HandlerType.PATCH, path, handler, permittedRoles);
     }
 
     public Javalin delete(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.DELETE, path, handler, permittedRoles);
+        return addHandler(HandlerType.DELETE, path, handler, permittedRoles);
     }
 
     public Javalin head(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.HEAD, path, handler, permittedRoles);
+        return addHandler(HandlerType.HEAD, path, handler, permittedRoles);
     }
 
     public Javalin trace(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.TRACE, path, handler, permittedRoles);
+        return addHandler(HandlerType.TRACE, path, handler, permittedRoles);
     }
 
     public Javalin connect(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.CONNECT, path, handler, permittedRoles);
+        return addHandler(HandlerType.CONNECT, path, handler, permittedRoles);
     }
 
     public Javalin options(@NotNull String path, @NotNull Handler handler, @NotNull List<Role> permittedRoles) {
-        return addSecuredHandler(HandlerType.OPTIONS, path, handler, permittedRoles);
+        return addHandler(HandlerType.OPTIONS, path, handler, permittedRoles);
     }
 
     // Filters
